@@ -6,14 +6,14 @@ import com.badlogic.ashley.core.EntitySystem;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 
-import static org.bytekeeper.Components.LARVA;
-import static org.bytekeeper.Components.POSITION;
+import static org.bytekeeper.Components.*;
 
 /**
  * Created by dante on 23.07.16.
@@ -22,7 +22,7 @@ public class WorldRenderSystem extends EntitySystem {
     private final AntGame antGame;
     private final Texture particle;
     private final Texture grass0;
-    private final TextureRegion ant;
+    private final TextureRegion antTexture;
     private final Texture cakeTexture;
     private final Texture baseTexture;
     private final Texture larvaTexture;
@@ -31,7 +31,9 @@ public class WorldRenderSystem extends EntitySystem {
     private Iterable<Entity> foods;
     private Iterable<Entity> bases;
     private SpriteBatch batch;
-    private Grid.ElementCallback renderCallback = new RenderCallBack();
+
+    private final Vector2 v1 = new Vector2();
+    private final Color c1 = new Color();
 
     public WorldRenderSystem(AntGame antGame) {
         this.antGame = antGame;
@@ -40,7 +42,7 @@ public class WorldRenderSystem extends EntitySystem {
         grass0 = new Texture(Gdx.files.internal("tileable_grass_00.png"), true);
         grass0.setFilter(Texture.TextureFilter.MipMapLinearLinear, Texture.TextureFilter.MipMapLinearLinear);
         grass0.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
-        ant = new TextureRegion(new Texture(Gdx.files.internal("ant.png"), true));
+        antTexture = new TextureRegion(new Texture(Gdx.files.internal("ant.png"), true));
         larvaTexture = new Texture(Gdx.files.internal("larva.png"), true);
         cakeTexture = new Texture(Gdx.files.internal("cake.png"), true);
         baseTexture = new Texture(Gdx.files.internal("base.png"), true);
@@ -48,7 +50,7 @@ public class WorldRenderSystem extends EntitySystem {
 
     @Override
     public void addedToEngine(Engine engine) {
-        ants = engine.getEntitiesFor(Family.all(Physical.class, AntAI.class).get());
+        ants = engine.getEntitiesFor(Family.all(Physical.class, Ant.class).get());
         larvas = engine.getEntitiesFor(Family.all(Physical.class, Larva.class).get());
         foods = engine.getEntitiesFor(Family.all(Physical.class, Food.class).get());
         bases = engine.getEntitiesFor(Family.all(Physical.class, Base.class).get());
@@ -71,12 +73,18 @@ public class WorldRenderSystem extends EntitySystem {
         for (Entity e: foods) {
             Physical physical = POSITION.get(e);
             Vector2 position = physical.position;
+            Food food = FOOD.get(e);
             batch.draw(cakeTexture, position.x - 20, position.y - 20, 40, 40);
+            float g = Math.min(1, food.amount / 300);
+            batch.setColor(1 - g, g, 0, 1);
+            batch.draw(particle, position.x + 10, position.y - 10, 15, 15);
+            batch.setColor(1, 1, 1, 1);
         }
 
         for (Entity e: bases) {
             Physical physical = POSITION.get(e);
             Vector2 position = physical.position;
+            batch.setColor(BASE.get(e).owner.color);
             batch.draw(baseTexture, position.x - 60, position.y - 60, 120, 120);
         }
 
@@ -85,15 +93,24 @@ public class WorldRenderSystem extends EntitySystem {
             Vector2 position = physical.position;
             Larva larva = LARVA.get(e);
             float scale = (float) (20 + Math.sin(larva.buildTimeRemaining * MathUtils.PI2) * 5);
+            batch.setColor(larva.owner.color);
             batch.draw(larvaTexture, position.x - scale / 2, position.y - scale / 2, scale, scale);
         }
 
-        batch.setColor(0.7f, 0.5f, 0.2f, 1);
-
         for (Entity e: ants) {
+            Ant ant = ANT.get(e);
             Physical physical = POSITION.get(e);
-            Vector2 position = physical.position;
-            batch.draw(ant, position.x - 10, position.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
+
+            if (State.GATHER_FOOD.equals(ant.state)) {
+                v1.set(Vector2.X).rotateRad(physical.orientation + MathUtils.PI).scl((float) (3 * Math.sin(ant.remaining * MathUtils.PI2 * 2))).
+                        add(physical.position);
+            } else {
+                v1.set(physical.position);
+            }
+            c1.set(ant.owner.color).
+                    mul(0.7f, 0.5f, 0.2f, 1);
+            batch.setColor(c1);
+            batch.draw(antTexture, v1.x - 10, v1.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
         }
         batch.end();
     }

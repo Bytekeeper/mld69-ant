@@ -9,7 +9,9 @@ import static com.badlogic.ashley.core.ComponentMapper.getFor;
  */
 public class Components {
     public static final ComponentMapper<Physical> POSITION = getFor(Physical.class);
-    public static final ComponentMapper<AntAI> ANT_AI = getFor(AntAI.class);
+    public static final ComponentMapper<Ant> ANT = getFor(Ant.class);
     public static final ComponentMapper<Food> FOOD = getFor(Food.class);
     public static final ComponentMapper<Larva> LARVA = getFor(Larva.class);
+    public static final ComponentMapper<Base> BASE = getFor(Base.class);
+    public static final ComponentMapper<Player> PLAYER = getFor(Player.class);
 }

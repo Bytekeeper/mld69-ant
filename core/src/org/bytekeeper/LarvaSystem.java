@@ -20,11 +20,18 @@ public class LarvaSystem extends IteratingSystem {
 
     @Override
     protected void processEntity(Entity entity, float deltaTime) {
+        if (game.paused) {
+            return;
+        }
         Larva larva = LARVA.get(entity);
         larva.buildTimeRemaining -= deltaTime;
         if (larva.buildTimeRemaining <= 0) {
             getEngine().removeEntity(entity);
-            game.addAnt(POSITION.get(entity).position);
+            switch (larva.morphInto) {
+                case GATHERER:
+                    game.spawnWorkerAnt(larva.owner, POSITION.get(entity).position);
+                    break;
+            }
         }
     }
 }
