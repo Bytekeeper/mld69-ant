@@ -6,7 +6,7 @@ import com.badlogic.ashley.core.EntitySystem;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.math.Vector2;
 
-import static org.bytekeeper.Components.POSITION;
+import static org.bytekeeper.Components.PHYSICAL;
 
 /**
  * Created by dante on 23.07.16.
@@ -32,11 +32,14 @@ public class AntMoveSystem extends EntitySystem {
             return;
         }
         for (Entity e: entities) {
-            Physical physical = POSITION.get(e);
+            Physical physical = PHYSICAL.get(e);
             if (physical.moveTime > 0) {
                 v1.set(Vector2.X).rotateRad(physical.orientation);
-                physical.position.mulAdd(v1, ANT_SPEED * Math.min(deltaTime, physical.moveTime));
+                Vector2 position = physical.position;
+                antGame.entityQueries.removeValue(position.x, position.y, e);
+                position.mulAdd(v1, ANT_SPEED * Math.min(deltaTime, physical.moveTime));
                 physical.moveTime = Math.max(0, physical.moveTime - deltaTime);
+                antGame.entityQueries.addValue(position.x, position.y, e);
             }
         }
     }

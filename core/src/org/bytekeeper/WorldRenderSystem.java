@@ -34,6 +34,7 @@ public class WorldRenderSystem extends EntitySystem {
 
     private final Vector2 v1 = new Vector2();
     private final Color c1 = new Color();
+    private RenderCallBack renderCallback = new RenderCallBack();
 
     public WorldRenderSystem(AntGame antGame) {
         this.antGame = antGame;
@@ -71,7 +72,7 @@ public class WorldRenderSystem extends EntitySystem {
         batch.draw(grass0, x - 512, y - 768/2, 1024, 768, u, v, u + 1, v - 768/1024f);
 
         for (Entity e: foods) {
-            Physical physical = POSITION.get(e);
+            Physical physical = PHYSICAL.get(e);
             Vector2 position = physical.position;
             Food food = FOOD.get(e);
             batch.draw(cakeTexture, position.x - 20, position.y - 20, 40, 40);
@@ -82,14 +83,14 @@ public class WorldRenderSystem extends EntitySystem {
         }
 
         for (Entity e: bases) {
-            Physical physical = POSITION.get(e);
+            Physical physical = PHYSICAL.get(e);
             Vector2 position = physical.position;
             batch.setColor(BASE.get(e).owner.color);
             batch.draw(baseTexture, position.x - 60, position.y - 60, 120, 120);
         }
 
         for (Entity e: larvas) {
-            Physical physical = POSITION.get(e);
+            Physical physical = PHYSICAL.get(e);
             Vector2 position = physical.position;
             Larva larva = LARVA.get(e);
             float scale = (float) (20 + Math.sin(larva.buildTimeRemaining * MathUtils.PI2) * 5);
@@ -99,7 +100,7 @@ public class WorldRenderSystem extends EntitySystem {
 
         for (Entity e: ants) {
             Ant ant = ANT.get(e);
-            Physical physical = POSITION.get(e);
+            Physical physical = PHYSICAL.get(e);
 
             if (State.GATHER_FOOD.equals(ant.state)) {
                 v1.set(Vector2.X).rotateRad(physical.orientation + MathUtils.PI).scl((float) (3 * Math.sin(ant.remaining * MathUtils.PI2 * 2))).
@@ -112,10 +113,14 @@ public class WorldRenderSystem extends EntitySystem {
             batch.setColor(c1);
             batch.draw(antTexture, v1.x - 10, v1.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
         }
+
+        renderCallback.reset();
+        antGame.humanPlayer.locationQueries.inRadius(0, 0, 1000, renderCallback);
+
         batch.end();
     }
 
-    private class RenderCallBack implements Grid.ElementCallback<Pheromon> {
+    private class RenderCallBack implements LocationQueries.Callback<Pheromon> {
         private float maxFood = 1;
         private float maxHome = 1;
 
@@ -126,6 +131,11 @@ public class WorldRenderSystem extends EntitySystem {
             batch.setColor(p.foodPath / maxFood, p.homePath / maxHome, 0, 1);
             batch.draw(particle, x, y, 5, 5);
             return false;
+        }
+
+        public void reset() {
+            maxHome = 1;
+            maxFood = 1;
         }
     }
 }

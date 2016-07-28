@@ -6,4 +6,5 @@ package org.bytekeeper;
 public class Pheromon {
     public float homePath;
     public float foodPath;
+    public float danger;
 }

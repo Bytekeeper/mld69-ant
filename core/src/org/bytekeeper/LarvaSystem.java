@@ -5,7 +5,7 @@ import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
 
 import static org.bytekeeper.Components.LARVA;
-import static org.bytekeeper.Components.POSITION;
+import static org.bytekeeper.Components.PHYSICAL;
 
 /**
  * Created by dante on 25.07.16.
@@ -29,7 +29,7 @@ public class LarvaSystem extends IteratingSystem {
             getEngine().removeEntity(entity);
             switch (larva.morphInto) {
                 case GATHERER:
-                    game.spawnWorkerAnt(larva.owner, POSITION.get(entity).position);
+                    game.spawnWorkerAnt(larva.owner, PHYSICAL.get(entity).position);
                     break;
             }
         }

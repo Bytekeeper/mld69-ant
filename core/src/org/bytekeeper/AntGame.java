@@ -2,6 +2,7 @@ package org.bytekeeper;
 
 import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
+import com.badlogic.ashley.core.EntityListener;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
@@ -18,6 +19,9 @@ import com.badlogic.gdx.scenes.scene2d.utils.ChangeListener;
 import com.badlogic.gdx.utils.viewport.FitViewport;
 import com.badlogic.gdx.utils.viewport.Viewport;
 
+import static org.bytekeeper.Components.PHYSICAL;
+import static org.bytekeeper.Components.PLAYER;
+
 public class AntGame extends ApplicationAdapter {
     public static final float COST_GATHERER = 5;
     public static final int SCROLL_SPEED = 300;
@@ -31,8 +35,8 @@ public class AntGame extends ApplicationAdapter {
     private Label antAmountLabel;
     private Skin skin;
     private TextButton buildWorkerButton;
-    private AntSystem antAISystem;
     public boolean paused = true;
+    public LocationQueries<Entity> entityQueries = new LocationQueries<>();
 
     private final Vector2 v1 = new Vector2();
     private WinConditionSystem winConditionSystem;
@@ -67,8 +71,7 @@ public class AntGame extends ApplicationAdapter {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
                 if (humanPlayer.food > COST_GATHERER) {
-                    humanPlayer.food -= COST_GATHERER;
-                    spawnLarva(humanPlayer, Buildable.GATHERER);
+                    spawnLarva(humanPlayer, Buildable.GATHERER, Vector2.Zero);
                 }
             }
         });
@@ -77,16 +80,29 @@ public class AntGame extends ApplicationAdapter {
         tutorial1();
 
         engine = new Engine();
+        engine.addSystem(new AntSystem(this));
         engine.addSystem(new AntMoveSystem(this));
-        antAISystem = new AntSystem(this);
-        engine.addSystem(antAISystem);
+        engine.addSystem(new AIPlayerSystem(this));
         engine.addSystem(new LarvaSystem(this));
         engine.addSystem(new FoodSystem(this));
         engine.addSystem(new WorldRenderSystem(this));
         winConditionSystem = new WinConditionSystem(this);
         engine.addSystem(winConditionSystem);
+        engine.addEntityListener(Family.all(Physical.class).get(), new EntityListener() {
+            @Override
+            public void entityAdded(Entity entity) {
+                Vector2 position = PHYSICAL.get(entity).position;
+                entityQueries.addValue(position.x, position.y, entity);
+            }
 
-        humanPlayer = createPlayer();
+            @Override
+            public void entityRemoved(Entity entity) {
+                Vector2 position = PHYSICAL.get(entity).position;
+                entityQueries.removeValue(position.x, position.y, entity);
+            }
+        });
+
+        humanPlayer = PLAYER.get(createPlayer());
         humanPlayer.color.set(1, 1, 1, 1);
 
         for (int i = 0; i < 20; i++) {
@@ -95,21 +111,23 @@ public class AntGame extends ApplicationAdapter {
         spawnStartBase(Vector2.Zero, humanPlayer);
         Color[] colors = new Color[] {Color.RED, Color.TEAL, Color.BLUE, Color.GREEN, Color.MAGENTA};
         for (int i = 0; i < 4; i++) {
-            Player ai = createPlayer();
-            ai.color.set(colors[i]);
+            Entity ai = createPlayer();
+            ai.add(new AIState());
+            Player aiPlayer = PLAYER.get(ai);
+            aiPlayer.color.set(colors[i]);
             v1.set(Vector2.X).scl(500 + rnd.nextFloat() * 400).rotateRad(MathUtils.PI2 * i / 4 + rnd.nextFloat());
-            spawnStartBase(v1, ai);
+            spawnStartBase(v1, aiPlayer);
         }
     }
 
-    private Player createPlayer() {
+    private Entity createPlayer() {
         Player player = new Player();
         player.food = 100;
 
         Entity playerEntity = new Entity();
         playerEntity.add(player);
         engine.addEntity(playerEntity);
-        return player;
+        return playerEntity;
     }
 
     private void spawnStartBase(Vector2 position, Player player) {
@@ -154,10 +172,11 @@ public class AntGame extends ApplicationAdapter {
         paused = false;
     }
 
-    private void spawnLarva(Player owner, Buildable type) {
+    public void spawnLarva(Player owner, Buildable type, Vector2 position) {
+        owner.food -= COST_GATHERER;
         Entity larvaEntity = new Entity();
         Physical physical = new Physical();
-        physical.position.set(rnd.nextFloat() * 50 - 25, rnd.nextFloat() * 50 - 25);
+        physical.position.set(rnd.nextFloat() * 50 - 25, rnd.nextFloat() * 50 - 25).add(position);
         Larva larva = new Larva();
         larva.buildTimeRemaining = 10;
         larva.owner = owner;
