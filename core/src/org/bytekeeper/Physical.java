@@ -10,4 +10,5 @@ public class Physical implements Component {
     public final Vector2 position = new Vector2();
     public float orientation;
     public float moveTime;
+    public float speed;
 }

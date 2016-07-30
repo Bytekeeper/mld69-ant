@@ -7,6 +7,6 @@ import com.badlogic.ashley.core.Component;
  */
 public class Larva implements Component {
     public Player owner;
-    public Buildable morphInto;
+    public AntType morphInto;
     public float buildTimeRemaining;
 }

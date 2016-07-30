@@ -21,9 +21,9 @@ import com.badlogic.gdx.utils.viewport.Viewport;
 
 import static org.bytekeeper.Components.PHYSICAL;
 import static org.bytekeeper.Components.PLAYER;
+import static org.bytekeeper.State.ATTACK;
 
 public class AntGame extends ApplicationAdapter {
-    public static final float COST_GATHERER = 5;
     public static final int SCROLL_SPEED = 300;
     private RandomXS128 rnd = new RandomXS128();
 	private Engine engine;
@@ -35,6 +35,7 @@ public class AntGame extends ApplicationAdapter {
     private Label antAmountLabel;
     private Skin skin;
     private TextButton buildWorkerButton;
+    private TextButton buildWarriorButton;
     public boolean paused = true;
     public LocationQueries<Entity> entityQueries = new LocationQueries<>();
 
@@ -66,16 +67,26 @@ public class AntGame extends ApplicationAdapter {
 
         Table bottomRow = new Table();
         root.add(bottomRow).pad(10).bottom().left().expand();
-        buildWorkerButton = new TextButton("Spawn gatherer", skin);
+        buildWorkerButton = new TextButton(String.format("Spawn gatherer (%.0f)", AntType.GATHERER.cost), skin);
         buildWorkerButton.addListener(new ChangeListener() {
             @Override
             public void changed(ChangeEvent event, Actor actor) {
-                if (humanPlayer.food > COST_GATHERER) {
-                    spawnLarva(humanPlayer, Buildable.GATHERER, Vector2.Zero);
+                if (humanPlayer.food >= AntType.GATHERER.cost) {
+                    spawnLarva(humanPlayer, AntType.GATHERER, Vector2.Zero);
                 }
             }
         });
         bottomRow.add(buildWorkerButton).pad(10);
+        buildWarriorButton = new TextButton(String.format("Spawn warrior (%.0f)", AntType.WARRIOR.cost), skin);
+        buildWarriorButton.addListener(new ChangeListener() {
+            @Override
+            public void changed(ChangeEvent event, Actor actor) {
+                if (humanPlayer.food >= AntType.WARRIOR.cost) {
+                    spawnLarva(humanPlayer, AntType.WARRIOR, Vector2.Zero);
+                }
+            }
+        });
+        bottomRow.add(buildWarriorButton).pad(10);
 
         tutorial1();
 
@@ -138,12 +149,20 @@ public class AntGame extends ApplicationAdapter {
     }
 
     private void tutorial1() {
-        addTutorialDialog(new Runnable() {
+        Dialog dialog = addTutorialDialog(new Runnable() {
             @Override
             public void run() {
                 tutorial2();
             }
         });
+        dialog.text("Starting with a base and 4 ants, ");
+        dialog.getContentTable().row();
+        dialog.text("defeat the enemy ant colonies!");
+        dialog.getContentTable().row();
+        dialog.text("Build gatherers to collect food.");
+        dialog.getContentTable().row();
+        dialog.text("Build warriors to attack and defend.");
+        dialog.pack();
     }
 
     private Dialog addTutorialDialog(Runnable nextRunnable) {
@@ -165,15 +184,21 @@ public class AntGame extends ApplicationAdapter {
     }
 
     private void tutorial2() {
-        addTutorialDialog(null);
+        Dialog dialog = addTutorialDialog(null);
+        dialog.text("The cake is not a lie, but a food source!");
+        dialog.getContentTable().row();
+        dialog.text("The colored dots beside show how much food is left.");
+        dialog.getContentTable().row();
+        dialog.text("Your ants consume food as well, so keep some around.");
+        dialog.pack();
     }
 
     private void endTutorial() {
         paused = false;
     }
 
-    public void spawnLarva(Player owner, Buildable type, Vector2 position) {
-        owner.food -= COST_GATHERER;
+    public void spawnLarva(Player owner, AntType type, Vector2 position) {
+        owner.food -= type.cost;
         Entity larvaEntity = new Entity();
         Physical physical = new Physical();
         physical.position.set(rnd.nextFloat() * 50 - 25, rnd.nextFloat() * 50 - 25).add(position);
@@ -187,17 +212,31 @@ public class AntGame extends ApplicationAdapter {
     }
 
     public void spawnWorkerAnt(Player owner, Vector2 position) {
-        Entity entity = new Entity();
+        Ant ant = spawnAnt(owner, position, 80);
+        ant.state = State.SEARCH_FOOD;
+        ant.type = AntType.GATHERER;
+    }
+
+    private Ant spawnAnt(Player owner, Vector2 position, float speed) {
         Ant ant = new Ant();
         ant.owner = owner;
-        ant.canGatherFood = true;
         Physical physical = new Physical();
         physical.orientation = rnd.nextFloat() * MathUtils.PI2 - MathUtils.PI;
         physical.position.set(position);
+        physical.speed = speed;
 
+        Entity entity = new Entity();
         entity.add(ant);
         entity.add(physical);
         engine.addEntity(entity);
+
+        return ant;
+    }
+
+    public void spawnWarriorAnt(Player owner, Vector2 position) {
+        Ant ant = spawnAnt(owner, position, 100);
+        ant.state = ATTACK;
+        ant.type = AntType.WARRIOR;
     }
 
     private void placeFood() {
@@ -256,7 +295,8 @@ public class AntGame extends ApplicationAdapter {
 
         foodLabel.setText((int) humanPlayer.food + " rations");
         antAmountLabel.setText(humanPlayer.antAmount + " ants");
-        buildWorkerButton.setDisabled(humanPlayer.food < COST_GATHERER);
+        buildWorkerButton.setDisabled(humanPlayer.food < AntType.GATHERER.cost);
+        buildWarriorButton.setDisabled(humanPlayer.food < AntType.WARRIOR.cost);
 
         stage.draw();
 	}
@@ -274,7 +314,12 @@ public class AntGame extends ApplicationAdapter {
                     Gdx.app.exit();
                 }
             });
-            stage.addActor(dialog);
+            if (winConditionSystem.wonBy == humanPlayer) {
+                dialog.text("You have won!!!");
+            } else {
+                dialog.text("You lost :(");
+            }
+            dialog.show(stage);
         }
     }
 

@@ -105,16 +105,24 @@ public class WorldRenderSystem extends EntitySystem {
             Ant ant = ANT.get(e);
             Physical physical = PHYSICAL.get(e);
 
-            if (State.GATHER_FOOD.equals(ant.state)) {
-                v1.set(Vector2.X).rotateRad(physical.orientation + MathUtils.PI).scl((float) (3 * Math.sin(ant.remaining * MathUtils.PI2 * 2))).
-                        add(physical.position);
-            } else {
-                v1.set(physical.position);
+            switch (ant.state) {
+                case GATHER_FOOD:
+                    v1.set(Vector2.X).rotateRad(physical.orientation + MathUtils.PI).scl((float) (3 * Math.sin(ant.remaining * MathUtils.PI2 * 2))).
+                            add(physical.position);
+                    break;
+                case RECOVER_FROM_ATTACKING:
+                    v1.set(Vector2.X).rotateRad(physical.orientation).scl(Math.max(ant.remaining - 0.7f, 0) * 40).
+                            add(physical.position);
+                    break;
+                default:
+                    v1.set(physical.position);
+                    break;
             }
             c1.set(ant.owner.color).
                     mul(0.7f, 0.5f, 0.2f, 1);
             batch.setColor(c1);
-            batch.draw(antTexture, v1.x - 10, v1.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
+            float antSize = ant.type == AntType.WARRIOR ? 15 : 10;
+            batch.draw(antTexture, v1.x - antSize, v1.y - antSize, antSize, antSize, antSize * 2, antSize * 2, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
 //            bitmapFont.draw(batch, ant.state.toString(), v1.x + 10, v1.y + 10);
         }
 

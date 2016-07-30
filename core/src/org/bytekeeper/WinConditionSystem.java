@@ -14,6 +14,7 @@ import static org.bytekeeper.Components.PLAYER;
  */
 public class WinConditionSystem extends EntitySystem {
     public static final Player DRAW = new Player();
+    public static final Player LOST = new Player();
     private final AntGame game;
     public Player wonBy = null;
     private Iterable<Entity> players;
@@ -40,7 +41,12 @@ public class WinConditionSystem extends EntitySystem {
                     return;
                 }
                 currentWinner = player;
+            } else if (player == game.humanPlayer) {
+                currentWinner = LOST;
+                wonBy = LOST;
+                return;
             }
         }
+        wonBy = currentWinner;
     }
 }

@@ -4,7 +4,10 @@ import com.badlogic.ashley.core.Engine;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.badlogic.gdx.math.Vector2;
 
+import static org.bytekeeper.AntType.GATHERER;
+import static org.bytekeeper.AntType.WARRIOR;
 import static org.bytekeeper.Components.*;
 
 /**
@@ -41,8 +44,12 @@ public class AIPlayerSystem extends IteratingSystem {
             }
         }
 
-        if (player.food > 110 + player.antAmount * 10) {
-            game.spawnLarva(player, Buildable.GATHERER, PHYSICAL.get(base).position);
+        Vector2 spawnPosition = PHYSICAL.get(base).position;
+        if (player.food > Math.max(GATHERER.cost, 30 + player.antAmount * 5)) {
+            game.spawnLarva(player, AntType.GATHERER, spawnPosition);
+        }
+        if (player.food > Math.max(WARRIOR.cost, 50 + player.antAmount * 3)) {
+            game.spawnLarva(player, WARRIOR, spawnPosition);
         }
     }
 }

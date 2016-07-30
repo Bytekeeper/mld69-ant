@@ -3,6 +3,7 @@ package org.bytekeeper;
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
 import com.badlogic.ashley.systems.IteratingSystem;
+import com.badlogic.gdx.math.Vector2;
 
 import static org.bytekeeper.Components.LARVA;
 import static org.bytekeeper.Components.PHYSICAL;
@@ -27,9 +28,13 @@ public class LarvaSystem extends IteratingSystem {
         larva.buildTimeRemaining -= deltaTime;
         if (larva.buildTimeRemaining <= 0) {
             getEngine().removeEntity(entity);
+            Vector2 position = PHYSICAL.get(entity).position;
             switch (larva.morphInto) {
                 case GATHERER:
-                    game.spawnWorkerAnt(larva.owner, PHYSICAL.get(entity).position);
+                    game.spawnWorkerAnt(larva.owner, position);
+                    break;
+                case WARRIOR:
+                    game.spawnWarriorAnt(larva.owner, position);
                     break;
             }
         }
