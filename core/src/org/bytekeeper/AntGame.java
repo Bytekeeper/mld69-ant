@@ -110,7 +110,7 @@ public class AntGame extends ApplicationAdapter {
         }
         spawnStartBase(Vector2.Zero, humanPlayer);
         Color[] colors = new Color[] {Color.RED, Color.TEAL, Color.BLUE, Color.GREEN, Color.MAGENTA};
-        for (int i = 0; i < 0; i++) {
+        for (int i = 0; i < 4; i++) {
             Entity ai = createPlayer();
             ai.add(new AIState());
             Player aiPlayer = PLAYER.get(ai);
@@ -131,7 +131,7 @@ public class AntGame extends ApplicationAdapter {
     }
 
     private void spawnStartBase(Vector2 position, Player player) {
-        for (int i = 0; i < 1; i++) {
+        for (int i = 0; i < 4; i++) {
             spawnWorkerAnt(player, position);
         }
         spawnBase(player, position);
@@ -173,17 +173,17 @@ public class AntGame extends ApplicationAdapter {
     }
 
     public void spawnLarva(Player owner, Buildable type, Vector2 position) {
-//        owner.food -= COST_GATHERER;
-//        Entity larvaEntity = new Entity();
-//        Physical physical = new Physical();
-//        physical.position.set(rnd.nextFloat() * 50 - 25, rnd.nextFloat() * 50 - 25).add(position);
-//        Larva larva = new Larva();
-//        larva.buildTimeRemaining = 10;
-//        larva.owner = owner;
-//        larva.morphInto = type;
-//        larvaEntity.add(larva);
-//        larvaEntity.add(physical);
-//        engine.addEntity(larvaEntity);
+        owner.food -= COST_GATHERER;
+        Entity larvaEntity = new Entity();
+        Physical physical = new Physical();
+        physical.position.set(rnd.nextFloat() * 50 - 25, rnd.nextFloat() * 50 - 25).add(position);
+        Larva larva = new Larva();
+        larva.buildTimeRemaining = 10;
+        larva.owner = owner;
+        larva.morphInto = type;
+        larvaEntity.add(larva);
+        larvaEntity.add(physical);
+        engine.addEntity(larvaEntity);
     }
 
     public void spawnWorkerAnt(Player owner, Vector2 position) {

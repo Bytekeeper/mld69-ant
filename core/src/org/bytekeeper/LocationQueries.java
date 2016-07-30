@@ -2,6 +2,7 @@ package org.bytekeeper;
 
 import com.badlogic.ashley.core.Entity;
 import com.badlogic.ashley.core.Family;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 
@@ -59,14 +60,28 @@ public class LocationQueries<T> {
         return false;
     }
 
-    private Array<Wrapper<T>> getBlock(float x, float y, boolean createIfMissing) {
-        int row = (int) (y / BLOCK_SIZE) * 2;
-        if (row < 0) {
-            row = -row - 1;
+    public Array<T> getValues(float x, float y) {
+        Array<T> result = new Array<>();
+        Array<Wrapper<T>> block = getBlock(x, y, false);
+        if (block != null) {
+            for (int i = block.size - 1; i >= 0; i--) {
+                Wrapper<T> wrapper = block.get(i);
+                if (wrapper.position.epsilonEquals(x, y, MathUtils.FLOAT_ROUNDING_ERROR)) {
+                    result.add(wrapper.value);
+                }
+            }
         }
-        int col = (int) ((x / BLOCK_SIZE) * 2);
-        if (col < 0) {
-            col = -col - 1;
+        return result;
+    }
+
+    private Array<Wrapper<T>> getBlock(float x, float y, boolean createIfMissing) {
+        int row = (int) Math.floor(y / BLOCK_SIZE) * 2;
+        if (y < 0) {
+            row = -row + 1;
+        }
+        int col = (int) Math.floor(x / BLOCK_SIZE) * 2;
+        if (x < 0) {
+            col = -col + 1;
         }
         Array<Array<Wrapper<T>>> column = null;
         if (values.size > row) {
@@ -92,6 +107,11 @@ public class LocationQueries<T> {
             entries = new Array<>();
             column.set(col, entries);
         }
+//        for (Wrapper<T> w: entries) {
+//            if (Math.abs(x - w.position.x) > BLOCK_SIZE || Math.abs(y - w.position.y) > BLOCK_SIZE) {
+//                throw new IllegalStateException();
+//            }
+//        }
         return entries;
     }
 

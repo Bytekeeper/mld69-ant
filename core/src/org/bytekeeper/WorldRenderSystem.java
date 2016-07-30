@@ -115,11 +115,11 @@ public class WorldRenderSystem extends EntitySystem {
                     mul(0.7f, 0.5f, 0.2f, 1);
             batch.setColor(c1);
             batch.draw(antTexture, v1.x - 10, v1.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
-            bitmapFont.draw(batch, ant.state.toString(), v1.x + 10, v1.y + 10);
+//            bitmapFont.draw(batch, ant.state.toString(), v1.x + 10, v1.y + 10);
         }
 
-        renderCallback.reset();
-        antGame.humanPlayer.locationQueries.inRadius(0, 0, 1000, renderCallback);
+//        renderCallback.reset();
+//        antGame.humanPlayer.pheromons.inRadius(0, 0, 1000, renderCallback);
 
         batch.end();
     }
@@ -132,8 +132,8 @@ public class WorldRenderSystem extends EntitySystem {
         public boolean accept(float x, float y, Pheromon p) {
             maxFood = Math.max(p.foodPath, maxFood);
             maxHome = Math.max(p.homePath, maxHome);
-            batch.setColor(p.foodPath / maxFood, p.homePath / maxHome, 0, 1);
-            batch.draw(particle, x, y, 5, 5);
+            batch.setColor(p.foodPath / maxFood, p.homePath / maxHome, 0, 0.5f);
+            batch.draw(particle, x - 25, y - 25, 50, 50);
             bitmapFont.getData().setScale(0.8f);
             bitmapFont.draw(batch, String.format("%.1f, %.1f", p.foodPath, p.homePath), x + 2, y + 2);
             bitmapFont.getData().setScale(1f);

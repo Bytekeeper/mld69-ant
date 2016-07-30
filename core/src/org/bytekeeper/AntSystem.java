@@ -8,8 +8,8 @@ import com.badlogic.ashley.utils.ImmutableArray;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.RandomXS128;
 import com.badlogic.gdx.math.Vector2;
+import com.badlogic.gdx.utils.Array;
 
-import static java.lang.Float.POSITIVE_INFINITY;
 import static org.bytekeeper.Components.*;
 import static org.bytekeeper.State.*;
 
@@ -17,18 +17,19 @@ import static org.bytekeeper.State.*;
  * Created by dante on 23.07.16.
  */
 public class AntSystem extends EntitySystem {
-    private static final float EPS = 0.0000001f;
     private static final float RASTER = 50;
     private static final float GATHER_AMOUNT = 10;
+    private static final float PHEROMON_RANGE = RASTER * 4;
     private ImmutableArray<Entity> entities;
     private AntGame game;
     private BestFoodTrail bestFoodTrail = new BestFoodTrail();
     private BestHomeTrail bestHomeTrail = new BestHomeTrail();
-    private Closest closest = new Closest();
+    private Dampening dampening = new Dampening();
     private static RandomXS128 rnd = new RandomXS128();
     private Iterable<Entity> foodStorages;
     private Iterable<Entity> food;
     private Iterable<Entity> players;
+    private Vector2 v1 = new Vector2();
 
     public AntSystem(AntGame game) {
         this.game = game;
@@ -71,27 +72,31 @@ public class AntSystem extends EntitySystem {
                 physical.orientation -= MathUtils.PI2;
             }
             Player owner = ant.owner;
-            Pheromon pheromon = getOrCreatePheromon(owner, physical.position.x, physical.position.y);
+            Wrapper wrapper = getOrCreatePheromon(owner, physical.position.x, physical.position.y);
+            Pheromon pheromon = wrapper.pheromon;
+            float dst = wrapper.dst / RASTER + 1;
+            pheromon.foodPath = Math.max(0, pheromon.foodPath - deltaTime / 2 / dst);
+            pheromon.homePath = Math.max(0, pheromon.homePath - deltaTime / 5 / dst);
             switch (ant.state) {
                 case IDLE:
                 case SEARCH_FOOD:
                     ant.distance += deltaTime;
-                    pheromon.homePath += deltaTime;
-                    pheromon.foodPath = Math.max(0, pheromon.foodPath - deltaTime / 2);
+                    pheromon.homePath = pheromon.homePath + deltaTime / (ant.distance + 5) * 10 / dst;
                     break;
                 case GATHER_FOOD:
+                    ant.distance += deltaTime;
+                    pheromon.foodPath =  pheromon.foodPath + deltaTime / (ant.distance + 5) * 10 / dst;
                     if (physical.moveTime == 0) {
                         ant.remaining = Math.max(ant.remaining - deltaTime, 0);
                         if (ant.remaining == 0) {
                             ant.state = BRING_FOOD_HOME;
+                            ant.distance = 0;
                         }
                     }
-                    ant.distance = 0;
                     break;
                 case BRING_FOOD_HOME:
                     ant.distance += deltaTime;
-                    pheromon.foodPath += deltaTime;
-                    pheromon.homePath = Math.max(0, pheromon.homePath - deltaTime / 4);
+                    pheromon.foodPath =  pheromon.foodPath + deltaTime / (ant.distance + 5) * 5 / dst;
                     break;
             }
             if (physical.moveTime > 0) {
@@ -133,20 +138,29 @@ public class AntSystem extends EntitySystem {
             if (dst < 20) {
                 ant.state = IDLE;
                 owner.food += GATHER_AMOUNT;
-                getOrCreatePheromon(owner, position.x, position.y).homePath++;
+                ant.distance = 0;
             }
-            if (dst < 30) {
-                moveToward(physical, position.x, position.y, 2);
+            if (dst < RASTER * 2) {
+                moveToward(physical, position, 2);
                 return;
             }
         }
         bestHomeTrail.reset();
-        owner.locationQueries.inRadius(physical.position.x, physical.position.y, 100, bestHomeTrail);
-        if (bestHomeTrail.best == null) {
+        bestHomeTrail.source.set(physical.position);
+        bestHomeTrail.orientation = physical.orientation;
+        owner.pheromons.inRadius(physical.position.x, physical.position.y, PHEROMON_RANGE, bestHomeTrail);
+        Vector2 target = bestHomeTrail.result();
+        moveToOrContinue(physical, target);
+    }
+
+    private void moveToOrContinue(Physical physical, Vector2 target) {
+        if (target == null) {
             applyMoveTime(physical);
-            applyScanOrientation(physical);
+            if (target == null) {
+                applyScanOrientation(physical);
+            }
         } else {
-            moveToward(physical, bestHomeTrail.bestTarget.x, bestHomeTrail.bestTarget.y, 10);
+            moveToward(physical, target, 20);
         }
     }
 
@@ -158,14 +172,16 @@ public class AntSystem extends EntitySystem {
         physical.moveTime = (rnd.nextFloat() + 1) / 3;
     }
 
-    private void moveToward(Physical physical, float x, float y, float precision) {
-        float dY = y - physical.position.y + rnd.nextFloat() * precision * 2 - precision;
-        float dX = x - physical.position.x + rnd.nextFloat() * precision * 2 - precision;
-        physical.orientation = (float) Math.atan2(dY, dX);
-        physical.moveTime = (float) (Math.sqrt(dX * dX + dY * dY) / AntMoveSystem.ANT_SPEED) * (rnd.nextFloat() / 10 + 0.95f);
+    private void moveToward(Physical physical, Vector2 target, float precision) {
+        v1.set(target);
+        v1.sub(physical.position);
+        v1.add(rnd.nextFloat() * precision * 2 - precision, rnd.nextFloat() * precision * 2 - precision);
+        physical.orientation = v1.angleRad();
+        physical.moveTime = v1.len() / AntMoveSystem.ANT_SPEED;
     }
 
     private void searchFood(Player owner, Ant ant, Physical physical) {
+        ant.state = SEARCH_FOOD;
         for (Entity f: food) {
             Physical fpos = PHYSICAL.get(f);
             Vector2 position = fpos.position;
@@ -175,108 +191,101 @@ public class AntSystem extends EntitySystem {
                     food.amount = Math.max(0, food.amount - GATHER_AMOUNT);
                     ant.state = GATHER_FOOD;
                     ant.remaining = 3;
-                    getOrCreatePheromon(owner, position.x, position.y).foodPath++;
                 }
-                if (position.dst(physical.position) < 50) {
-                    moveToward(physical, position.x, position.y, 2);
+                if (position.dst(physical.position) < RASTER) {
+                    moveToward(physical, position, 2);
                     return;
                 }
             }
         }
         bestFoodTrail.reset();
-        owner.locationQueries.inRadius(physical.position.x, physical.position.y, 50, bestFoodTrail);
-        ant.state = SEARCH_FOOD;
-        if (bestFoodTrail.best == null || rnd.nextFloat() < 0.01f) {
-            applyMoveTime(physical);
-            applyScanOrientation(physical);
-        } else {
-            moveToward(physical, bestFoodTrail.bestTarget.x, bestFoodTrail.bestTarget.y, 10);
-        }
+        bestFoodTrail.source.set(physical.position);
+        bestFoodTrail.orientation = physical.orientation;
+        owner.pheromons.inRadius(physical.position.x, physical.position.y, PHEROMON_RANGE, bestFoodTrail);
+        Vector2 target = bestFoodTrail.result();
+        moveToOrContinue(physical, rnd.nextFloat() < 0.01f ? null : target);
     }
 
-    public Pheromon getOrCreatePheromon(Player owner, float x, float y) {
-        closest.reset();
-        closest.target.set(x, y);
-        owner.locationQueries.inRadius(x, y, RASTER * 1.5f, closest);
-        if (closest.best != null) {
-            return closest.best;
+    public Wrapper getOrCreatePheromon(Player owner, float x, float y) {
+        float _x = x;
+        float _y = y;
+        x = (float) Math.floor(x / RASTER + .5f) * RASTER;
+        y = (float) Math.floor(y / RASTER + .5f) * RASTER;
+        _x -= x;
+        _y -= y;
+        Array<Pheromon> values = owner.pheromons.getValues(x, y);
+        if (values.size > 0) {
+            return new Wrapper(values.get(0), (float) Math.sqrt(_x * _x + _y * _y));
         }
         Pheromon pheromon = new Pheromon();
-        owner.locationQueries.addValue((float) Math.floor(x / RASTER) * RASTER, (float) (Math.floor(y / RASTER) * RASTER), pheromon);
-        return pheromon;
+        owner.pheromons.addValue(x, y, pheromon);
+        return new Wrapper(pheromon, (float) Math.sqrt(_x * _x + _y * _y));
     }
 
-    public static class Closest implements LocationQueries.Callback<Pheromon> {
-        Pheromon best;
-        float bestDst = POSITIVE_INFINITY;
-        final Vector2 target = new Vector2();
+    public static class BestFoodTrail extends BestTrail<Pheromon> {
+        @Override
+        protected float eval(Pheromon e) {
+            return e.foodPath;
+        }
+    }
+
+
+    public static abstract class BestTrail<T> implements LocationQueries.Callback<T> {
+        final Vector2 bestTarget = new Vector2();
+        final Vector2 source = new Vector2();
+        final Vector2 v1 = new Vector2();
+        final Vector2 v2 = new Vector2();
+        float orientation;
+        float sum;
 
         public void reset() {
-            best = null;
-            bestDst = POSITIVE_INFINITY;
+            bestTarget.setZero();
+            sum = 0;
         }
+
+        public Vector2 result() {
+            return sum > 0 ? bestTarget.scl(1 / sum) : null;
+        }
+
+        @Override
+        public boolean accept(float x, float y, T e) {
+            float res = eval(e);
+            v2.set(Vector2.X);
+            float dot = v1.set(x, y).sub(source).nor().dot(v2.rotateRad(orientation));
+            res *= (dot + 1.5f);
+            bestTarget.add(x * res, y * res);
+            sum += res;
+            return false;
+        }
+
+        protected abstract float eval(T e);
+    }
+
+    public static class BestHomeTrail extends BestTrail<Pheromon> {
+        @Override
+        protected float eval(Pheromon e) {
+            return e.homePath;
+        }
+    }
+
+    private static class Dampening implements LocationQueries.Callback<Pheromon> {
+        float amount;
 
         @Override
         public boolean accept(float x, float y, Pheromon e) {
-            float dst = target.dst(x, y);
-            if (dst < bestDst) {
-                best = e;
-                bestDst = dst;
-            }
+            e.homePath = Math.max(0, e.homePath - amount);
+            e.foodPath = Math.max(0, e.foodPath - amount);
             return false;
         }
     }
 
-    public static class BestFoodTrail implements LocationQueries.Callback<Pheromon> {
-        Pheromon best;
-        float bestScore;
-        final Vector2 bestTarget = new Vector2();
+    private static class Wrapper {
+        final Pheromon pheromon;
+        final float dst;
 
-        public void reset() {
-            best = null;
-            bestScore = Float.NEGATIVE_INFINITY;
-        }
-
-        @Override
-        public boolean accept(float x, float y, Pheromon p) {
-            float score = p.foodPath;
-            if (score > 0) {
-                score += rnd.nextFloat() * EPS;
-            }
-            if (score > 0 && (best == null || score > bestScore)) {
-                best = p;
-                bestTarget.set(x, y);
-                bestScore = score;
-            }
-            return false;
-        }
-    }
-
-    public static class BestHomeTrail implements LocationQueries.Callback<Pheromon> {
-        Pheromon best;
-        float bestScore;
-        final Vector2 bestTarget = new Vector2();
-        public int visited;
-
-        public void reset() {
-            best = null;
-            bestScore = Float.NEGATIVE_INFINITY;
-            visited = 0;
-        }
-
-        @Override
-        public boolean accept(float x, float y, Pheromon p) {
-            visited++;
-            float score = p.homePath;
-            if (score > 0) {
-                score += rnd.nextFloat() * EPS;
-            }
-            if (score > 0 && (best == null || score > bestScore)) {
-                best = p;
-                bestScore = score;
-                bestTarget.set(x, y);
-            }
-            return false;
+        private Wrapper(Pheromon pheromon, float dst) {
+            this.pheromon = pheromon;
+            this.dst = dst;
         }
     }
 }

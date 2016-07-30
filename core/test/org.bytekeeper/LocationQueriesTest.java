@@ -1,5 +1,6 @@
 package org.bytekeeper;
 
+import com.badlogic.gdx.math.RandomXS128;
 import com.badlogic.gdx.math.Vector2;
 import org.hamcrest.CoreMatchers;
 import org.junit.Test;
@@ -18,6 +19,7 @@ import static org.junit.Assert.assertThat;
  */
 public class LocationQueriesTest {
     private LocationQueries<String> sut = new LocationQueries<>();
+    private RandomXS128 rnd = new RandomXS128();
 
     @Test
     public void shouldFindItemsOnBounds() {
@@ -80,6 +82,39 @@ public class LocationQueriesTest {
 
         // THEN
         assertThat(collector.result, is(Collections.singletonList(new X(new Vector2(-1000, -1000), "a"))));
+    }
+
+    @Test
+    public void shouldNegativeYItems() {
+        // GIVEN
+        sut.addValue(200, -210, "a");
+        sut.addValue(-200, -190, "b");
+
+        Collector collector = new Collector();
+
+        // WHEN
+        sut.inRadius(0, 0, 1000, collector);
+
+        // THEN
+        assertThat(collector.result, hasItems(new X(new Vector2(200, -210), "a"), new X(new Vector2(-200, -190), "b")));
+    }
+
+    @Test
+    public void shouldGetAllItemsInRadius() {
+        // GIVEN
+        for (int i = 0; i < 100; i++) {
+            float x = 200 + rnd.nextFloat() * 1000 - 500;
+            float y = 200 + rnd.nextFloat() * 1000 - 500;
+            sut.addValue(x, y, "a");
+        }
+
+        Collector collector = new Collector();
+
+        // WHEN
+        sut.inRadius(500, 500, 1400, collector);
+
+        // THEN
+        assertThat(collector.result.size(), is(100));
     }
 
 
