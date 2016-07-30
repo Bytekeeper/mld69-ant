@@ -8,6 +8,7 @@ import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.graphics.Camera;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.Texture;
+import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.math.MathUtils;
@@ -31,6 +32,7 @@ public class WorldRenderSystem extends EntitySystem {
     private Iterable<Entity> foods;
     private Iterable<Entity> bases;
     private SpriteBatch batch;
+    private BitmapFont bitmapFont;
 
     private final Vector2 v1 = new Vector2();
     private final Color c1 = new Color();
@@ -47,6 +49,7 @@ public class WorldRenderSystem extends EntitySystem {
         larvaTexture = new Texture(Gdx.files.internal("larva.png"), true);
         cakeTexture = new Texture(Gdx.files.internal("cake.png"), true);
         baseTexture = new Texture(Gdx.files.internal("base.png"), true);
+        bitmapFont = new BitmapFont();
     }
 
     @Override
@@ -112,6 +115,7 @@ public class WorldRenderSystem extends EntitySystem {
                     mul(0.7f, 0.5f, 0.2f, 1);
             batch.setColor(c1);
             batch.draw(antTexture, v1.x - 10, v1.y - 10, 10, 10, 20, 20, 1, 1, MathUtils.radiansToDegrees * physical.orientation);
+            bitmapFont.draw(batch, ant.state.toString(), v1.x + 10, v1.y + 10);
         }
 
         renderCallback.reset();
@@ -130,6 +134,9 @@ public class WorldRenderSystem extends EntitySystem {
             maxHome = Math.max(p.homePath, maxHome);
             batch.setColor(p.foodPath / maxFood, p.homePath / maxHome, 0, 1);
             batch.draw(particle, x, y, 5, 5);
+            bitmapFont.getData().setScale(0.8f);
+            bitmapFont.draw(batch, String.format("%.1f, %.1f", p.foodPath, p.homePath), x + 2, y + 2);
+            bitmapFont.getData().setScale(1f);
             return false;
         }
 

@@ -15,6 +15,13 @@ public class LocationQueries<T> {
 
     public void addValue(float x, float y, T value) {
         Array<Wrapper<T>> block = getBlock(x, y, true);
+        if (value instanceof Pheromon) {
+            for (Wrapper<T> exist : block) {
+                if (exist.position.epsilonEquals(x, y, 0.0001f)) {
+                    throw new IllegalStateException();
+                }
+            }
+        }
         block.add(new Wrapper<>(value, x, y));
     }
 
@@ -118,6 +125,14 @@ public class LocationQueries<T> {
             int result = position.hashCode();
             result = 31 * result + value.hashCode();
             return result;
+        }
+
+        @Override
+        public String toString() {
+            return "Wrapper{" +
+                    "position=" + position +
+                    ", value=" + value +
+                    '}';
         }
     }
 

@@ -18,7 +18,7 @@ import static org.bytekeeper.State.*;
  */
 public class AntSystem extends EntitySystem {
     private static final float EPS = 0.0000001f;
-    private static final float RASTER = 20;
+    private static final float RASTER = 50;
     private static final float GATHER_AMOUNT = 10;
     private ImmutableArray<Entity> entities;
     private AntGame game;
@@ -47,6 +47,7 @@ public class AntSystem extends EntitySystem {
         if (game.paused) {
             return;
         }
+        deltaTime = Math.min(deltaTime, 1 / 30f);
         for (Entity e: players) {
             PLAYER.get(e).antAmount = 0;
         }
@@ -75,8 +76,8 @@ public class AntSystem extends EntitySystem {
                 case IDLE:
                 case SEARCH_FOOD:
                     ant.distance += deltaTime;
-                    pheromon.homePath += deltaTime / (ant.distance + 1);
-                    pheromon.foodPath = Math.max(0, pheromon.foodPath - deltaTime);
+                    pheromon.homePath += deltaTime;
+                    pheromon.foodPath = Math.max(0, pheromon.foodPath - deltaTime / 2);
                     break;
                 case GATHER_FOOD:
                     if (physical.moveTime == 0) {
@@ -85,11 +86,12 @@ public class AntSystem extends EntitySystem {
                             ant.state = BRING_FOOD_HOME;
                         }
                     }
+                    ant.distance = 0;
                     break;
                 case BRING_FOOD_HOME:
                     ant.distance += deltaTime;
-                    pheromon.foodPath += deltaTime / (ant.distance + 1);
-                    pheromon.homePath = Math.max(0, pheromon.homePath - deltaTime / 20);
+                    pheromon.foodPath += deltaTime;
+                    pheromon.homePath = Math.max(0, pheromon.homePath - deltaTime / 4);
                     break;
             }
             if (physical.moveTime > 0) {
@@ -127,25 +129,24 @@ public class AntSystem extends EntitySystem {
             }
             Physical fpos = PHYSICAL.get(f);
             Vector2 position = fpos.position;
-            if (position.dst(physical.position) < 50) {
+            float dst = position.dst(physical.position);
+            if (dst < 20) {
                 ant.state = IDLE;
-                ant.distance = 0;
                 owner.food += GATHER_AMOUNT;
+                getOrCreatePheromon(owner, position.x, position.y).homePath++;
+            }
+            if (dst < 30) {
                 moveToward(physical, position.x, position.y, 2);
                 return;
             }
         }
         bestHomeTrail.reset();
         owner.locationQueries.inRadius(physical.position.x, physical.position.y, 100, bestHomeTrail);
-        applyMoveTime(physical);
-        if (bestHomeTrail.best == null ||
-                Vector2.dst(bestHomeTrail.bestTarget.x,
-                        bestHomeTrail.bestTarget.y,
-                        physical.position.x,
-                        physical.position.y) < 30) {
+        if (bestHomeTrail.best == null) {
+            applyMoveTime(physical);
             applyScanOrientation(physical);
         } else {
-            moveToward(physical, bestHomeTrail.bestTarget.x, bestHomeTrail.bestTarget.y, 30);
+            moveToward(physical, bestHomeTrail.bestTarget.x, bestHomeTrail.bestTarget.y, 10);
         }
     }
 
@@ -161,6 +162,7 @@ public class AntSystem extends EntitySystem {
         float dY = y - physical.position.y + rnd.nextFloat() * precision * 2 - precision;
         float dX = x - physical.position.x + rnd.nextFloat() * precision * 2 - precision;
         physical.orientation = (float) Math.atan2(dY, dX);
+        physical.moveTime = (float) (Math.sqrt(dX * dX + dY * dY) / AntMoveSystem.ANT_SPEED) * (rnd.nextFloat() / 10 + 0.95f);
     }
 
     private void searchFood(Player owner, Ant ant, Physical physical) {
@@ -168,39 +170,39 @@ public class AntSystem extends EntitySystem {
             Physical fpos = PHYSICAL.get(f);
             Vector2 position = fpos.position;
             Food food = FOOD.get(f);
-            if (food.amount > 0 && position.dst(physical.position) < 50) {
-                ant.distance = 0;
-                food.amount = Math.max(0, food.amount - GATHER_AMOUNT);
-                ant.state = GATHER_FOOD;
-                ant.remaining = 3;
-                getOrCreatePheromon(owner, position.x, position.y).foodPath++;
-                moveToward(physical, position.x, position.y, 2);
-                return;
+            if (food.amount > 0) {
+                if (position.dst(physical.position) < 20) {
+                    food.amount = Math.max(0, food.amount - GATHER_AMOUNT);
+                    ant.state = GATHER_FOOD;
+                    ant.remaining = 3;
+                    getOrCreatePheromon(owner, position.x, position.y).foodPath++;
+                }
+                if (position.dst(physical.position) < 50) {
+                    moveToward(physical, position.x, position.y, 2);
+                    return;
+                }
             }
         }
         bestFoodTrail.reset();
-        owner.locationQueries.inRadius(physical.position.x, physical.position.y, 100, bestFoodTrail);
+        owner.locationQueries.inRadius(physical.position.x, physical.position.y, 50, bestFoodTrail);
         ant.state = SEARCH_FOOD;
-        applyMoveTime(physical);
-        if (bestFoodTrail.best == null || rnd.nextFloat() < 0.02f ||
-                Vector2.dst(bestFoodTrail.bestTarget.x,
-                        bestFoodTrail.bestTarget.y,
-                        physical.position.x,
-                        physical.position.y) < 2) {
+        if (bestFoodTrail.best == null || rnd.nextFloat() < 0.01f) {
+            applyMoveTime(physical);
             applyScanOrientation(physical);
         } else {
-            moveToward(physical, bestFoodTrail.bestTarget.x, bestFoodTrail.bestTarget.y, 30);
+            moveToward(physical, bestFoodTrail.bestTarget.x, bestFoodTrail.bestTarget.y, 10);
         }
     }
 
     public Pheromon getOrCreatePheromon(Player owner, float x, float y) {
         closest.reset();
-        owner.locationQueries.inRadius(x, y, 50, closest);
+        closest.target.set(x, y);
+        owner.locationQueries.inRadius(x, y, RASTER * 1.5f, closest);
         if (closest.best != null) {
             return closest.best;
         }
         Pheromon pheromon = new Pheromon();
-        owner.locationQueries.addValue((float) Math.ceil(x / RASTER) * RASTER, (float) (Math.ceil(y / RASTER) * RASTER), pheromon);
+        owner.locationQueries.addValue((float) Math.floor(x / RASTER) * RASTER, (float) (Math.floor(y / RASTER) * RASTER), pheromon);
         return pheromon;
     }
 
@@ -254,14 +256,17 @@ public class AntSystem extends EntitySystem {
         Pheromon best;
         float bestScore;
         final Vector2 bestTarget = new Vector2();
+        public int visited;
 
         public void reset() {
             best = null;
             bestScore = Float.NEGATIVE_INFINITY;
+            visited = 0;
         }
 
         @Override
         public boolean accept(float x, float y, Pheromon p) {
+            visited++;
             float score = p.homePath;
             if (score > 0) {
                 score += rnd.nextFloat() * EPS;
